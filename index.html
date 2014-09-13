@@ -78,7 +78,7 @@
   
   <div id="description">
 
-    WATER GEM
+    <a href="https://soundcloud.com/kidsimpledubs/jhene-aiko-growing-apart-too" target="_blank">Jhene Aiko - Growing Apart Too (Kid Smpl Remix)</a>
 
   </div>
 
@@ -93,52 +93,118 @@
 <script src = "lib/Stream.js"               ></script>
 <script src = "lib/AudioController.js"      ></script>
 <script src = "lib/AudioTexture.js"         ></script>
-<script src = "lib/ObjectControls.js"       ></script>
 <script src = "lib/PhysicsRenderer.js"      ></script>
 <script src = "lib/ParticleUtils.js"        ></script>
-<script src = "lib/OBJLoader.js"            ></script>
-<script src = "lib/leap.js"                 ></script>
 <script src = "lib/dat.gui.min.js"          ></script>
 
 <script src = "GEM.js"                     ></script>
+<script src = "GUI.js"                     ></script>
 
 <script>
 
-  console.log('Loading');
-
   var container , camera, scene, renderer , stats;
 
+  var gem , gui;
+
+  var tv1 = new THREE.Vector3();
+  var tv2 = new THREE.Vector3();
+  var repelerMeshes = [];
+  var repelersHidden = true;
+
+
+  // TODO: make into loader
+  var loaded = 0;
+  var neededToLoad = 1;
+
+  var clock = new THREE.Clock();
+
+  var audioController = new AudioController();
+//  audioController.mute.gain.value = 0;
+
+  var stream = new Stream(  'audio/kid.mp3',audioController  );
   
-  var sceneSize = 5;
+ /* var userAudio = new UserAudio( audioController );
 
-  var gem;
+  userAudio.onStreamCreated = function(){
 
-  var rP
+    onLoad();
+
+  }*/
+
+
+  var shaders = new ShaderLoader('shaders');
+
+  shaders.load( 'ss-ball' , 'ball' , 'simulation' );
+  
+  shaders.load( 'vs-plastic' , 'plastic' , 'vertex' );
+  shaders.load( 'fs-plastic' , 'plastic' , 'fragment' );
+  
+  shaders.load( 'vs-wireframe' , 'wireframe' , 'vertex' );
+  shaders.load( 'fs-wireframe' , 'wireframe' , 'fragment' );
+  
+  shaders.load( 'vs-striped' , 'striped' , 'vertex' );
+  shaders.load( 'fs-striped' , 'striped' , 'fragment' );
+  
+  
+  shaders.load( 'vs-ambient' , 'ambient' , 'vertex' );
+  shaders.load( 'fs-ambient' , 'ambient' , 'fragment' );
+  
+  shaders.load( 'vs-fractal' , 'fractal' , 'vertex' );
+  shaders.load( 'fs-fractal' , 'fractal' , 'fragment' );
+  
+
+  shaders.shaderSetLoaded = function(){
+   onLoad();
+  }
+
+
+
+  /*
+
+    PARAMS
+
+  */
+
+
   var PARAMS = {
 
-    simulation:{
-      repelers:{ type:"v3v" , value:[]},
-      velocities:{ type:"v3v" , value:[]},
-      aPower:{ type:"v3v" , value:[] },
-      repulsionPower:   { type:"f" , value: 10 },
-      repulsionRadius:  { type:"f" , value: 600 },
-      dampening:        { type:"f" , value: .95 },
+    soul:{
+     
+      repulsionPower:   { type:"f" , value: 14  , constraints:[-10 , 50] },
+      repulsionRadius:  { type:"f" , value: 300 , constraints:[10 , 600] },
+      dampening:        { type:"f" , value: .98 , constraints:[.8 , .999] },
+
+      //custom1:          { type:"f" , value: 0 , constraints:[ 0 , 1] },
       
+      repelers:         { type:"v3v" , value:[] },
+      radii:            { type:"v3v" , value:[] },
+      velocities:       { type:"v3v" , value:[] },
+      aPower:           { type:"v3v" , value:[] },
+
+      t_audio:          { type:"t" , value: audioController.texture    },
+
     },
 
-    render:{
-      audioDisplacement:{ type:"f" , value : 0 },
+    body:{
+      
+      repelers:{ type:"v3v" , value:[]},      
+      repeler:{ type:"v3v" , value:[]},      
+      audioDisplacement:{ type:"f" , value : 0 ,  constraints:[ 0 , 2]},
       lambTemp: { r:0 , b:0 , g:0 },
       specTemp: { r:0 , b:0 , g:0 },
       audioTemp: { r:0 , b:0 , g:0 },
-      custom1:{type:"f" , value: Math.random()},
-      custom2:{type:"f" , value: Math.random()},
-      custom3:{type:"f" , value: Math.random()},
+      custom1:{type:"f" , value: Math.random(),  constraints:[ 0 , 1]},
+      custom2:{type:"f" , value: Math.random(),  constraints:[ 0 , 1]},
+      custom3:{type:"f" , value: Math.random(), constraints:[ 0 , 1]},
       c_lamb:{ type:"c" , value : new THREE.Color( 0xff0000 ) },
       c_spec:{ type:"c" , value : new THREE.Color( 0x00ff00) },
       c_audio:{ type:"c" , value : new THREE.Color( 0x0000ff ) },
-      lightPos:{type:"v3" , value: new THREE.Vector3( 1 , 1 , 1 )}
+      lightPos:{type:"v3" , value: new THREE.Vector3( 10 , 1 , 1 )},
+      t_audio:    { type:"t" , value: audioController.texture    },
+
     },
+
+    repelers:[],
 
     vs:null,
     fs:null,
@@ -165,233 +231,49 @@
     geometries:{
 
       plane: new THREE.PlaneGeometry( 30 , 30 , 100 , 100 ) 
-
-
-
-
     },
     
     simulations:{
 
-
     }
 
 
 
   }
 
-  var gui = new dat.GUI({autoPlace:false});
 
-  gui.close();
-
-  var guiContainer = document.getElementById('GUI');
-  guiContainer.appendChild(gui.domElement);
-
-  guiSim    = gui.addFolder( 'Simulation' );
-  guiRender = gui.addFolder( 'Render' );
-
-
-  guiSim.add( PARAMS.simulation.repulsionPower , 'value' , -10 , 100).name( 'Repulsion Power' );
-  guiSim.add( PARAMS.simulation.repulsionRadius , 'value' , 10 , 1000).name( 'Repulsion Radius' );
-  guiSim.add( PARAMS.simulation.dampening , 'value' , .8 , .999 ).name( 'Dampenening' );
-
-  guiSim.add( PARAMS , 'toggle').name( 'toggleRepelers' );
-
-
-
-  guiSim.add( PARAMS, 'objectType' , [
-    //'cube',
-    //'sphere' ,
-    'plane',
-    //'hand' , 
-    //'skull' , 
-    //'logo' ,
-    //'bieb' ,
-    //'rickAndBarney', 
-    //'ring', 
-    //'torus' 
-  ] ).onChange( function(value){
-
-    recreateGeometry(value);
-    console.log(value);
-
-  });
-
-
-  guiRender.add( PARAMS.render.audioDisplacement , 'value' , -3 , 3).name( 'Audio Displacement' );
-  guiRender.add( PARAMS.render.custom1 , 'value' , 0 , 1).name( 'Custom1' );
-  guiRender.add( PARAMS.render.custom2 , 'value' , 0 , 1).name( 'Custom2' );
-  guiRender.add( PARAMS.render.custom3 , 'value' , 0 , 1).name( 'Custom3' );
-  
-  guiRender.addColor( PARAMS.render , 'lambTemp' ).name( 'Lambert' ).onChange( function( value ){
-
-    PARAMS.render.c_lamb.value.r =value.r / 256;
-    PARAMS.render.c_lamb.value.g =value.g / 256;
-    PARAMS.render.c_lamb.value.b =value.b / 256;
-    
-  }).listen();
-
-  guiRender.addColor( PARAMS.render , 'specTemp' ).name( 'Specular' ).onChange( function( value ){
-
-    PARAMS.render.c_spec.value.r =value.r / 256;
-    PARAMS.render.c_spec.value.g =value.g / 256;
-    PARAMS.render.c_spec.value.b =value.b / 256;
-    
-  }).listen();
-
-   guiRender.addColor( PARAMS.render , 'audioTemp' ).name( 'Fresnel?' ).onChange( function( value ){
-
-    PARAMS.render.c_audio.value.r =value.r / 256;
-    PARAMS.render.c_audio.value.g =value.g / 256;
-    PARAMS.render.c_audio.value.b =value.b / 256;
-    
-  }).listen();
-
-
-  PARAMS.render.lambTemp.r = PARAMS.render.c_lamb.value.r * 256;
-  PARAMS.render.lambTemp.g = PARAMS.render.c_lamb.value.g * 256;
-  PARAMS.render.lambTemp.b = PARAMS.render.c_lamb.value.b * 256;
-
-  PARAMS.render.specTemp.r = PARAMS.render.c_spec.value.r * 256;
-  PARAMS.render.specTemp.g = PARAMS.render.c_spec.value.g * 256;
-  PARAMS.render.specTemp.b = PARAMS.render.c_spec.value.b * 256;
-
-  PARAMS.render.audioTemp.r = PARAMS.render.c_audio.value.r * 256;
-  PARAMS.render.audioTemp.g = PARAMS.render.c_audio.value.g * 256;
-  PARAMS.render.audioTemp.b = PARAMS.render.c_audio.value.b * 256;
-
-
-
-
-  guiRender.add( PARAMS,'visualType' , [  
-    'plastic' , 
-    'wireframe' , 
-    'striped' , 
-    'ambient',
-    'fractal'
-  ]).onChange(function(value){
-
-   // recreateMaterial( value );
-
-  });
-  var tv1 = new THREE.Vector3();
-  var tv2 = new THREE.Vector3();
-  var repelerMeshes = [];
-  var repelersHidden = true;
-
-  var mouse = new THREE.Vector2();
-  var oMouse = mouse.clone();
-
-  var camRotation = 0;
-  var camTheta = 0;
-
-
-  var loaded = 0;
-  var neededToLoad = 2;
-
-  var waterRender = { type:"f" ,value:0}
-
-  var clock = new THREE.Clock();
-
-  var audioController = new AudioController();
-  audioController.mute.gain.value = 0;
-
-  var controller = new Leap.Controller();
-  controller.connect();
-
-  var camUniforms;
-
-
-  var stream = new Stream(  'love.mp3',audioController  );
-  
-
-  var userAudio = new UserAudio( audioController );
-
-  userAudio.onStreamCreated = function(){
-
-    onLoad();
-
-  }
-  //var controller = new Leap.Controller();
-
-  var time = { type:"f" , value:0 }
-  var dT = { type:"f" , value:0 }
-  var t_audio = { type:"t" , value:audioController.texture}
-
-
-  var shaders = new ShaderLoader('shaders');
-
-  shaders.load( 'ss-ball' , 'ball' , 'simulation' );
-  
-  shaders.load( 'vs-plastic' , 'plastic' , 'vertex' );
-  shaders.load( 'fs-plastic' , 'plastic' , 'fragment' );
-  
-  shaders.load( 'vs-wireframe' , 'wireframe' , 'vertex' );
-  shaders.load( 'fs-wireframe' , 'wireframe' , 'fragment' );
-  
-  shaders.load( 'vs-striped' , 'striped' , 'vertex' );
-  shaders.load( 'fs-striped' , 'striped' , 'fragment' );
-  
-  
-  shaders.load( 'vs-ambient' , 'ambient' , 'vertex' );
-  shaders.load( 'fs-ambient' , 'ambient' , 'fragment' );
-  shaders.load( 'vs-fractal' , 'fractal' , 'vertex' );
-  shaders.load( 'fs-fractal' , 'fractal' , 'fragment' );
-  
-
-  shaders.shaderSetLoaded = function(){
-   onLoad();
- }
-
-
-  
-   var geometries = {
-
-
-     plane: new THREE.PlaneGeometry( 10 , 10 , 500 , 500 ),
-    //torus:new THREE.TorusGeometry( 10, 5, 80, 1000 ), 
-    //sphere:new THREE.IcosahedronGeometry( 9 , 7 ), 
-    //cube:new THREE.BoxGeometry( 15 , 15 , 15 , 150 , 150 , 150 ),
-   // plane: new THREE.PlaneGeometry( 30 , 30 , 1000 , 1000 )
-    //rickAndBarney: new Text( 'cabbibo' ).geo
-
-  }
  
-  
 
-  var materials = {
+ function init(){
 
-
-
-  }
-
-  function init(){
-
-    materials.plastic = { 
+    PARAMS.materials.plastic = { 
       vs: shaders.vertexShaders.plastic,
       fs: shaders.fragmentShaders.plastic
     }
 
-     materials.wireframe = { 
+    PARAMS.materials.wireframe = { 
       vs: shaders.vertexShaders.wireframe,
       fs: shaders.fragmentShaders.wireframe
     }
 
-    materials.striped = {
+    PARAMS.materials.striped = {
       vs: shaders.vertexShaders.striped,
       fs: shaders.fragmentShaders.striped
     }
 
-    materials.ambient = {
+    PARAMS.materials.ambient = {
       vs: shaders.vertexShaders.ambient,
       fs: shaders.fragmentShaders.ambient
     }
 
-    materials.fractal = {
+    PARAMS.materials.fractal = {
       vs: shaders.vertexShaders.fractal,
       fs: shaders.fragmentShaders.fractal
     }
 
+    gui = new GUI( PARAMS , {
+     domElement: document.getElementById( 'GUI' ) 
+    });
 
 
     scene = new THREE.Scene();
@@ -399,22 +281,14 @@
     camera = new THREE.PerspectiveCamera( 
       50 ,
       window.innerWidth / window.innerHeight,
-      sceneSize / 100 ,
-      sceneSize * 4000
+      .05,
+      1000
     );
 
     // placing our camera position so it can see everything
     camera.position.z = 30 ;
     camera.lookAt( new THREE.Vector3() );
 
-
-    camera.theta = 0;
-    camera.rotationSpeed = 0;
-
-
-    //controls.noPan = true;
-    //controls.noRoll = true;
-   // controls.noRotate = true; 
 
     // Getting the container in the right location
     container     = document.createElement( 'div' );
@@ -442,15 +316,11 @@
     window.addEventListener( 'resize', onWindowResize , false );
     window.addEventListener( 'mousemove', onMouseMove , false );
    
-
-    var obj = new THREE.Object3D();
-    objectControls = new ObjectControls( camera , obj , controller );
   
 
     var w = window.innerWidth ;
     var h = window.innerHeight;
   
-
   
     var g = new THREE.IcosahedronGeometry( .1 , 1 );
     var m = new THREE.MeshNormalMaterial();
@@ -459,11 +329,13 @@
 
       var mesh = new THREE.Mesh( g , m );
 
-    
+    /*  PARAMS.repelers.push( mesh );
+
+    }*/
+
       var p = ( i / 25 );
       var x = 10 * Math.cos( p * Math.PI * 2 );
       var y = 10 * Math.sin( p * Math.PI * 2 );
-
 
      // mesh.position.z = 100000;
 
@@ -475,11 +347,12 @@
       mesh.velocity = new THREE.Vector3();
 
      // scene.add( mesh );
-      PARAMS.simulation.repelers.value.push( mesh.position );
-      PARAMS.simulation.velocities.value.push( mesh.velocity );
-      PARAMS.simulation.aPower.value.push( new THREE.Vector3() );
+      PARAMS.soul.repelers.value.push( mesh.position );
+      PARAMS.soul.velocities.value.push( mesh.velocity );
+      PARAMS.soul.aPower.value.push( new THREE.Vector3() );
 
-      repelerMeshes.push( mesh );
+
+      PARAMS.repelers.push( mesh );
 
     }
 
@@ -503,15 +376,11 @@
 
   function animate(){
 
-    objectControls.update();
     audioController.update();
 
     PARAMS.dT.value = clock.getDelta();
-    PARAMS.time.value += dT.value;
+    PARAMS.time.value += PARAMS.dT.value;
 
-    dT.value = PARAMS.dT.value;
-    time.value = PARAMS.time.value;
-    
     gem.update();
 
     stats.update();
@@ -520,17 +389,17 @@
 
 
    
-    for( var i = 0; i < PARAMS.simulation.repelers.value.length; i++ ){
+    for( var i = 0; i < PARAMS.soul.repelers.value.length; i++ ){
        
        /*var r1 = u.repelers.value[i];
        var v1 = u.velocities.value[i];*/
 
 
-       var ind = i / (2 *  PARAMS.simulation.repelers.value.length); 
+       var ind = i / (2 *  PARAMS.soul.repelers.value.length); 
        var fI = Math.floor( ind * audioController.analyzer.array.length );
        var p = audioController.analyzer.array[ fI ];
 
-        PARAMS.simulation.aPower.value[i].x = p / 256;
+        PARAMS.soul.aPower.value[i].x = p / 256;
       
 
 
@@ -541,130 +410,14 @@
 
     }
 
-    var t = time.value;
-
     renderer.render( scene , camera );
 
     requestAnimationFrame( animate );
 
   }
 
-  function updateCamera(){
-
-    camera.theta += camera.rotationSpeed;
 
 
-    var x = 2000 * Math.cos( camera.theta );
-    var z = 2000  * Math.sin( camera.theta );
-    camera.position.x = x;
-    camera.position.z = z;
-    camera.lookAt( new THREE.Vector3() );
-
-    camera.rotationSpeed  *= .95;
-
-    
-  }
-
-  function recreateGeometry( type ){
-
-    if( ball ){
-
-      ball.removeFromScene();
-
-      var vs = ball.vs;
-      var fs = ball.fs;
-      var ss = ball.ss;
-      
-     // ball = new Face( geometries[type] , ss , vs , fs , u );
-      ball = new GEM({
-        geometry: geometries[type],
-        ss:ss, 
-        vs:vs,
-        fs:fs,
-        u:u 
-      });
-
-      ball.addToScene();
-
-    }else{
-
-      var ss = shaders.simulationShaders.ball;
-      var vs = shaders.vertexShaders.ball;
-      var fs = shaders.fragmentShaders.ball;
-     // ball = new Face( geometries[type] , ss , vs , fs , u );
-      ball = new GEM({
-        geometry: geometries[type],
-        ss:ss, 
-        vs:vs,
-        fs:fs,
-        u:u 
-      });
-
-      ball.addToScene();
-
-
-
-    }
-
-  }
-
-
-  function recreateMaterial( type ){
-
-    PARAMS.vs = PARAMS.materials[type].vs;
-    PARAMS.fs = PARAMS.materials[type].fs;
-
-
-    if( gem ){
-
-      gem.removeFromScene();
-
-      PARAMS.vs = PARAMS.materials[type].vs;
-      PARAMS.fs = PARAMS.materials[type].fs;
-
-      gem = new GEM( PARAMS );
-
-      gem.addToScene();
-
-    }else{
-
-      PARAMS.vs = PARAMS.materials[type].vs;
-      PARAMS.fs = PARAMS.materials[type].fs;
-      PARAMS.ss = PARAMS.simulations['ball'].ss;
-      gem = new GEM( PARAMS );
-      gem.addToScene();
-      var ss = shaders.simulationShaders.ball;
-      
-      //ball = new Face( geometries['sphere'] , ss , vs , fs , u );
-
-      ball = new GEM({
-        geometry: geometries['sphere'],
-        ss:ss, 
-        vs:vs,
-        fs:fs,
-        u:u 
-      });
-
-      ball.addToScene();
-
-
-
-    }
-
-  }
-
-  function recreateGEM(){
-
-    if( gem ){
-      gem.removeFromScene();
-      // TODO: gem.die
-    } 
-
-    PARAMS.
-
-    gem = new GEM( PARAMS );
-
-  }
 
   function toggleRepelers(){
 
@@ -712,17 +465,7 @@
 
   function onMouseMove(e ){
 
-    oMouse.copy( mouse );
-    mouse.set( e.clientX , e.clientY );
-
-
-    var dif = (mouse.x - oMouse.x) / 1000;
-    var sign = dif < 0 ? -1 : 1;
-
-    camera.rotationSpeed += sign * dif * dif;
-
-
-
+ 
   }
 
   // Resets the renderer to be the proper size
@@ -757,7 +500,7 @@
    
       if( stream ){
       
-        //stream.play();
+        stream.play();
 
       }
 

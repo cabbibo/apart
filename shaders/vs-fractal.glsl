@@ -16,6 +16,7 @@ varying vec3 vPos;
 varying vec3 vMPos;
 
 varying vec3 vLightDir;
+varying float vLightDist;
 
 varying float vLife;
 varying vec4 vAudio;
@@ -84,8 +85,7 @@ void main(){
   pos.xyz += vNorm * length(vAudio )* audioDisplacement;//01;
   vPos = pos.xyz;
   vLightDir = normalize( vMPos - lightPos );
-  vLightPos = lightPos;
-
+  vLightDist = length( vMPos - lightPos );
   vCamVec = normalize( cameraPosition - vMPos);
   gl_Position = projectionMatrix * modelViewMatrix * vec4( pos.xyz , 1. );
 

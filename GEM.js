@@ -13,11 +13,15 @@ function GEM( params ){
     depthWrite: true,
     side: THREE.DoubleSide,
     
-    type: 'mesh' 
+    type: 'mesh',
+
+    dT:{type:"f" , value:0 },
+    timer:{type:"f" , value:0 },
+    t_audio:{type:"t" , value:null }
 
   });
 
-  if( !this.params.render || !this.params.simulation  ){
+  if( !this.params.soul || !this.params.body  ){
     this.error('no uniform passed' );
   }
 
@@ -34,13 +38,13 @@ function GEM( params ){
 
   this.soul = new PhysicsRenderer( this.size , this.ss , renderer );
 
-  this.soul.setUniform( 'dT'    , dT );
-  this.soul.setUniform( 'timer' , time );
+  this.soul.setUniform( 'dT'    , this.params.dT );
+  this.soul.setUniform( 'timer' , this.params.time );
   this.soul.setUniform( 't_og'  , this.t_og );
   
-  for( var propt in this.params.simulation ){
+  for( var propt in this.params.soul ){
 
-    this.soul.setUniform( propt , this.params.simulation[propt] );
+    this.soul.setUniform( propt , this.params.soul[propt] );
 
   }
 
@@ -48,16 +52,16 @@ function GEM( params ){
 
     t_pos:{ type:"t" , value:null },
     t_oPos:{ type:"t" , value:null },
-    t_audio:t_audio,
+    t_audio: this.params.t_audio,
     t_og:this.t_og,
     time: this.params.time,
     dT: this.params.dT,
 
   }
 
-  for( var propt in this.params.render ){
+  for( var propt in this.params.body ){
 
-    this.uniforms[ propt ] = this.params.render[propt];
+    this.uniforms[ propt ] = this.params.body[propt];
 
   }
 
